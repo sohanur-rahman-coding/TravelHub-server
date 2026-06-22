@@ -10,7 +10,7 @@ dontenv.config();
 const uri = process.env.MONGODB_URI;
 
 const app = express();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 5000;
 
 app.use(
   cors({
@@ -36,20 +36,13 @@ async function run() {
     const usersCollection = db.collection("user");
     const BookedTicketsCollection = db.collection("booked_tickets");
 
-    // Get tickets (Dynamic filter via query params)
+    // 1. Get all tickets (Dynamic filter via query params)
     app.get("/api/tickets", async (req, res) => {
       try {
         const { email, status } = req.query;
-
         let query = {};
-
-        if (email) {
-          query.vendorEmail = email;
-        }
-
-        if (status) {
-          query.verificationStatus = status;
-        }
+        if (email) query.vendorEmail = email;
+        if (status) query.verificationStatus = status;
 
         const tickets = await ticketsCollection
           .find(query)
@@ -62,7 +55,20 @@ async function run() {
       }
     });
 
-    // Get a single ticket by ID
+    // 2. Advertisment data get route (MUST BE ABOVE /:id ROUTE)
+    app.get("/api/tickets/advertised", async (req, res) => {
+      try {
+        const advertisedTickets = await ticketsCollection
+          .find({ isAdvertised: true })
+          .toArray();
+        res.status(200).json(advertisedTickets);
+      } catch (error) {
+        console.error("Error fetching advertised tickets:", error);
+        res.status(500).json({ message: "Internal server error" });
+      }
+    });
+
+    // 3. Get a single ticket by ID (MUST BE BELOW SPECIFIC ROUTES)
     app.get("/api/tickets/:id", async (req, res) => {
       try {
         const id = req.params.id;
@@ -85,26 +91,7 @@ async function run() {
       }
     });
 
-    // BOOKING TICKET MODAL
-    app.post("/api/bookings", async (req, res) => {
-      try {
-        const ticket = req.body;
-        const result = await BookedTicketsCollection.insertOne(ticket);
-
-        res.status(201).json({
-          success: true,
-          message: "Booking successful",
-          bookingId: result.insertedId,
-        });
-      } catch (error) {
-        console.error("Booking Error:", error);
-        res
-          .status(500)
-          .json({ success: false, message: "Internal Server Error" });
-      }
-    });
-
-    // 'upload ticket data to database
+    // upload ticket data to database
     app.post("/api/tickets", async (req, res) => {
       try {
         const ticket = req.body;
@@ -167,6 +154,77 @@ async function run() {
       }
     });
 
+    // advertisement route
+    app.patch("/api/tickets/:id/advertise", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { advertise } = req.body;
+
+        if (advertise) {
+          const advertisedCount = await ticketsCollection.countDocuments({
+            isAdvertised: true,
+          });
+          if (advertisedCount >= 6) {
+            return res.status(400).json({
+              message: "You cannot advertise more than 6 tickets at a time.",
+            });
+          }
+        }
+
+        const result = await ticketsCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { isAdvertised: advertise } },
+        );
+
+        res
+          .status(200)
+          .json({ message: "Advertisement status updated successfully" });
+      } catch (error) {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    });
+
+    // booking modal
+    app.post("/api/bookings", async (req, res) => {
+      try {
+        const bookingData = req.body;
+
+        const existingBooking = await BookedTicketsCollection.findOne({
+          ticketId: bookingData.ticketId,
+          userEmail: bookingData.userEmail,
+        });
+
+        if (existingBooking) {
+          await BookedTicketsCollection.updateOne(
+            { _id: existingBooking._id },
+            {
+              $inc: {
+                quantity: bookingData.quantity,
+                totalPrice: bookingData.totalPrice,
+              },
+            },
+          );
+        } else {
+          await BookedTicketsCollection.insertOne(bookingData);
+        }
+
+        const filter = { _id: new ObjectId(bookingData.ticketId) };
+        const updateDoc = {
+          $inc: { quantity: -bookingData.quantity },
+        };
+        await ticketsCollection.updateOne(filter, updateDoc);
+
+        res.status(201).json({
+          success: true,
+          message: "Booking successful!",
+        });
+      } catch (error) {
+        res
+          .status(500)
+          .json({ success: false, message: "Internal Server Error" });
+      }
+    });
+
     // get all users
     app.get("/api/users", async (req, res) => {
       try {
@@ -225,48 +283,6 @@ async function run() {
           .json({ message: "Vendor marked as fraud and all tickets hidden" });
       } catch (error) {
         console.error("Error marking fraud:", error);
-        res.status(500).json({ message: "Internal server error" });
-      }
-    });
-    // advertisment data get route
-    app.get("/api/tickets/advertised", async (req, res) => {
-      try {
-        const advertisedTickets = await ticketsCollection
-          .find({ isAdvertised: true })
-          .toArray();
-        res.status(200).json(advertisedTickets);
-      } catch (error) {
-        console.error("Error fetching advertised tickets:", error);
-        res.status(500).json({ message: "Internal server error" });
-      }
-    });
-
-    // advertisement route
-    app.patch("/api/tickets/:id/advertise", async (req, res) => {
-      try {
-        const { id } = req.params;
-        const { advertise } = req.body;
-
-        if (advertise) {
-          const advertisedCount = await ticketsCollection.countDocuments({
-            isAdvertised: true,
-          });
-          if (advertisedCount >= 6) {
-            return res.status(400).json({
-              message: "You cannot advertise more than 6 tickets at a time.",
-            });
-          }
-        }
-
-        const result = await ticketsCollection.updateOne(
-          { _id: new ObjectId(id) },
-          { $set: { isAdvertised: advertise } },
-        );
-
-        res
-          .status(200)
-          .json({ message: "Advertisement status updated successfully" });
-      } catch (error) {
         res.status(500).json({ message: "Internal server error" });
       }
     });
