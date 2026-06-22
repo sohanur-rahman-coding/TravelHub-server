@@ -130,7 +130,6 @@ async function run() {
     res.status(500).json({ message: "Internal server error" });
   }
 });
-
 // set user as fraud
 
 app.patch("/api/users/:id/fraud", async (req, res) => {
