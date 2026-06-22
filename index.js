@@ -111,6 +111,46 @@ async function run() {
       }
     });
 
+    // update user role
+    app.patch("/api/users/:id/role", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+    
+    const result = await userCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { role: role } }
+    );
+    
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.status(200).json({ message: `Role updated to ${role}` });
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// set user as fraud
+
+app.patch("/api/users/:id/fraud", async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await userCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { isFraud: true } }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.status(200).json({ message: "Marked as fraud" });
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!",
