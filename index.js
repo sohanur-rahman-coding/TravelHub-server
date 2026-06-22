@@ -33,6 +33,7 @@ async function run() {
     await client.connect();
     const db = client.db("TravelHub");
     const ticketsCollection = db.collection("tickets");
+    const usersCollection = db.collection("user");
 
     // 'upload ticket data to database'
     app.post("/api/tickets", async (req, res) => {
@@ -95,6 +96,17 @@ async function run() {
         res.status(200).json({ message: "Ticket deleted" });
       } catch (error) {
         console.error("Error deleting ticket:", error);
+        res.status(500).json({ message: "Internal server error" });
+      }
+    });
+
+    // get all users
+    app.get("/api/users", async (req, res) => {
+      try {
+        const users = await usersCollection.find().toArray();
+        res.status(200).json(users);
+      } catch (error) {
+        console.error("Error fetching users:", error);
         res.status(500).json({ message: "Internal server error" });
       }
     });
