@@ -53,7 +53,10 @@ async function run() {
       try {
         const { email } = req.query;
         const query = email ? { vendorEmail: email } : {};
-        const tickets = await ticketsCollection.find(query).toArray();
+        const tickets = await ticketsCollection
+          .find(query)
+          .sort({ _id: -1 })
+          .toArray();
         res.status(200).json(tickets);
       } catch (error) {
         res.status(500).json({ message: "Internal server error" });
