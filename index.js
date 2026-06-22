@@ -60,6 +60,42 @@ async function run() {
       }
     });
 
+    // Update ticket data
+    app.patch("/api/tickets/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const updatedData = req.body;
+        const result = await ticketsCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: updatedData },
+        );
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ message: "Ticket not found" });
+        }
+        res.status(200).json({ message: "Ticket updated" });
+      } catch (error) {
+        console.error("Error updating ticket:", error);
+        res.status(500).json({ message: "Internal server error" });
+      }
+    });
+
+    // delete a ticket
+    app.delete("/api/tickets/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const result = await ticketsCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+        if (result.deletedCount === 0) {
+          return res.status(404).json({ message: "Ticket not found" });
+        }
+        res.status(200).json({ message: "Ticket deleted" });
+      } catch (error) {
+        console.error("Error deleting ticket:", error);
+        res.status(500).json({ message: "Internal server error" });
+      }
+    });
+
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!",
