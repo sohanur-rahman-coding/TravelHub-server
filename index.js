@@ -34,8 +34,77 @@ async function run() {
     const db = client.db("TravelHub");
     const ticketsCollection = db.collection("tickets");
     const usersCollection = db.collection("user");
+    const BookedTicketsCollection = db.collection("booked_tickets");
 
-    // 'upload ticket data to database'
+    // Get tickets (Dynamic filter via query params)
+    app.get("/api/tickets", async (req, res) => {
+      try {
+        const { email, status } = req.query;
+
+        let query = {};
+
+        if (email) {
+          query.vendorEmail = email;
+        }
+
+        if (status) {
+          query.verificationStatus = status;
+        }
+
+        const tickets = await ticketsCollection
+          .find(query)
+          .sort({ _id: -1 })
+          .toArray();
+
+        res.status(200).json(tickets);
+      } catch (error) {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    });
+
+    // Get a single ticket by ID
+    app.get("/api/tickets/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        if (!ObjectId.isValid(id)) {
+          return res.status(400).json({ message: "Invalid ticket ID format" });
+        }
+
+        const query = { _id: new ObjectId(id) };
+        const ticket = await ticketsCollection.findOne(query);
+
+        if (!ticket) {
+          return res.status(404).json({ message: "Ticket not found" });
+        }
+
+        res.status(200).json(ticket);
+      } catch (error) {
+        console.error("Error fetching single ticket:", error);
+        res.status(500).json({ message: "Internal server error" });
+      }
+    });
+
+    // BOOKING TICKET MODAL
+    app.post("/api/bookings", async (req, res) => {
+      try {
+        const ticket = req.body;
+        const result = await BookedTicketsCollection.insertOne(ticket);
+
+        res.status(201).json({
+          success: true,
+          message: "Booking successful",
+          bookingId: result.insertedId,
+        });
+      } catch (error) {
+        console.error("Booking Error:", error);
+        res
+          .status(500)
+          .json({ success: false, message: "Internal Server Error" });
+      }
+    });
+
+    // 'upload ticket data to database
     app.post("/api/tickets", async (req, res) => {
       try {
         const ticket = req.body;
@@ -58,21 +127,6 @@ async function run() {
           .json({ message: "Ticket created", id: result.insertedId });
       } catch (error) {
         console.error("Error creating ticket:", error);
-        res.status(500).json({ message: "Internal server error" });
-      }
-    });
-
-    // get my added tickets
-    app.get("/api/tickets", async (req, res) => {
-      try {
-        const { email } = req.query;
-        const query = email ? { vendorEmail: email } : {};
-        const tickets = await ticketsCollection
-          .find(query)
-          .sort({ _id: -1 })
-          .toArray();
-        res.status(200).json(tickets);
-      } catch (error) {
         res.status(500).json({ message: "Internal server error" });
       }
     });
@@ -144,7 +198,7 @@ async function run() {
       }
     });
 
-    // set user as fraud (আপডেট করা হয়েছে: টিকেট হাইড করার লজিক)
+    // set user as fraud
     app.patch("/api/users/:id/fraud", async (req, res) => {
       try {
         const { id } = req.params;
@@ -171,6 +225,48 @@ async function run() {
           .json({ message: "Vendor marked as fraud and all tickets hidden" });
       } catch (error) {
         console.error("Error marking fraud:", error);
+        res.status(500).json({ message: "Internal server error" });
+      }
+    });
+    // advertisment data get route
+    app.get("/api/tickets/advertised", async (req, res) => {
+      try {
+        const advertisedTickets = await ticketsCollection
+          .find({ isAdvertised: true })
+          .toArray();
+        res.status(200).json(advertisedTickets);
+      } catch (error) {
+        console.error("Error fetching advertised tickets:", error);
+        res.status(500).json({ message: "Internal server error" });
+      }
+    });
+
+    // advertisement route
+    app.patch("/api/tickets/:id/advertise", async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { advertise } = req.body;
+
+        if (advertise) {
+          const advertisedCount = await ticketsCollection.countDocuments({
+            isAdvertised: true,
+          });
+          if (advertisedCount >= 6) {
+            return res.status(400).json({
+              message: "You cannot advertise more than 6 tickets at a time.",
+            });
+          }
+        }
+
+        const result = await ticketsCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { isAdvertised: advertise } },
+        );
+
+        res
+          .status(200)
+          .json({ message: "Advertisement status updated successfully" });
+      } catch (error) {
         res.status(500).json({ message: "Internal server error" });
       }
     });
