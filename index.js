@@ -39,6 +39,19 @@ async function run() {
     app.post("/api/tickets", async (req, res) => {
       try {
         const ticket = req.body;
+
+        if (ticket.vendorEmail) {
+          const vendor = await usersCollection.findOne({
+            email: ticket.vendorEmail,
+          });
+
+          if (vendor && vendor.isFraud) {
+            return res
+              .status(403)
+              .json({ message: "Fraudulent vendors cannot add new tickets." });
+          }
+        }
+
         const result = await ticketsCollection.insertOne(ticket);
         res
           .status(201)
@@ -113,42 +126,54 @@ async function run() {
 
     // update user role
     app.patch("/api/users/:id/role", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { role } = req.body;
-    
-    const result = await userCollection.updateOne(
-      { _id: new ObjectId(id) },
-      { $set: { role: role } }
-    );
-    
-    if (result.matchedCount === 0) {
-      return res.status(404).json({ message: "User not found" });
-    }
-    res.status(200).json({ message: `Role updated to ${role}` });
-  } catch (error) {
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
-// set user as fraud
+      try {
+        const { id } = req.params;
+        const { role } = req.body;
 
-app.patch("/api/users/:id/fraud", async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const result = await userCollection.updateOne(
-      { _id: new ObjectId(id) },
-      { $set: { isFraud: true } }
-    );
+        const result = await usersCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { role: role } },
+        );
 
-    if (result.matchedCount === 0) {
-      return res.status(404).json({ message: "User not found" });
-    }
-    res.status(200).json({ message: "Marked as fraud" });
-  } catch (error) {
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ message: "User not found" });
+        }
+        res.status(200).json({ message: `Role updated to ${role}` });
+      } catch (error) {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    });
+
+    // set user as fraud (আপডেট করা হয়েছে: টিকেট হাইড করার লজিক)
+    app.patch("/api/users/:id/fraud", async (req, res) => {
+      try {
+        const { id } = req.params;
+
+        const user = await usersCollection.findOne({ _id: new ObjectId(id) });
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        await usersCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { isFraud: true } },
+        );
+
+        if (user.email) {
+          await ticketsCollection.updateMany(
+            { vendorEmail: user.email },
+            { $set: { verificationStatus: "rejected", isFraud: true } },
+          );
+        }
+
+        res
+          .status(200)
+          .json({ message: "Vendor marked as fraud and all tickets hidden" });
+      } catch (error) {
+        console.error("Error marking fraud:", error);
+        res.status(500).json({ message: "Internal server error" });
+      }
+    });
 
     await client.db("admin").command({ ping: 1 });
     console.log(
