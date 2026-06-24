@@ -192,6 +192,7 @@ async function run() {
         const existingBooking = await BookedTicketsCollection.findOne({
           ticketId: bookingData.ticketId,
           userEmail: bookingData.userEmail,
+          status: "pending",
         });
 
         if (existingBooking) {
@@ -208,20 +209,75 @@ async function run() {
           await BookedTicketsCollection.insertOne(bookingData);
         }
 
-        const filter = { _id: new ObjectId(bookingData.ticketId) };
-        const updateDoc = {
-          $inc: { quantity: -bookingData.quantity },
-        };
-        await ticketsCollection.updateOne(filter, updateDoc);
-
         res.status(201).json({
           success: true,
-          message: "Booking successful!",
+          message: "Booking request sent to vendor!",
         });
       } catch (error) {
         res
           .status(500)
           .json({ success: false, message: "Internal Server Error" });
+      }
+    });
+
+    // Vendor: Get Requested Bookings (By Vendor Email)
+    app.get("/api/bookings/vendor/:email", async (req, res) => {
+      try {
+        const email = req.params.email;
+        const query = { vendorEmail: email };
+        const bookings = await BookedTicketsCollection.find(query).toArray();
+        res.status(200).json(bookings);
+      } catch (error) {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    });
+
+    // Vendor: Update Booking Status (Accept / Reject)
+    app.patch("/api/bookings/:id/status", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const { status } = req.body;
+
+        const result = await BookedTicketsCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { status: status } },
+        );
+
+        if (result.matchedCount === 0) {
+          return res.status(404).json({ message: "Booking not found" });
+        }
+        res.status(200).json({ message: `Booking ${status} successfully!` });
+      } catch (error) {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    });
+
+    // User: Get My Booked Tickets with Full Ticket Details
+    app.get("/api/bookings/user/:email", async (req, res) => {
+      try {
+        const email = req.params.email;
+        const bookings = await BookedTicketsCollection.aggregate([
+          { $match: { userEmail: email } },
+          {
+            $addFields: {
+              ticketObjId: { $toObjectId: "$ticketId" },
+            },
+          },
+          {
+            $lookup: {
+              from: "tickets",
+              localField: "ticketObjId",
+              foreignField: "_id",
+              as: "ticketDetails",
+            },
+          },
+          { $unwind: "$ticketDetails" },
+        ]).toArray();
+
+        res.status(200).json(bookings);
+      } catch (error) {
+        console.error("Error fetching user bookings:", error);
+        res.status(500).json({ message: "Internal server error" });
       }
     });
 
@@ -283,6 +339,36 @@ async function run() {
           .json({ message: "Vendor marked as fraud and all tickets hidden" });
       } catch (error) {
         console.error("Error marking fraud:", error);
+        res.status(500).json({ message: "Internal server error" });
+      }
+    });
+    // User: Update Booking to Paid & Reduce Ticket Quantity (After Payment)
+    app.patch("/api/bookings/:id/pay", async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        const booking = await BookedTicketsCollection.findOne({
+          _id: new ObjectId(id),
+        });
+        if (!booking) {
+          return res.status(404).json({ message: "Booking not found" });
+        }
+
+        await BookedTicketsCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { status: "paid" } },
+        );
+
+        await ticketsCollection.updateOne(
+          { _id: new ObjectId(booking.ticketId) },
+          { $inc: { quantity: -booking.quantity } },
+        );
+
+        res
+          .status(200)
+          .json({ message: "Payment successful and ticket quantity updated!" });
+      } catch (error) {
+        console.error("Payment update error:", error);
         res.status(500).json({ message: "Internal server error" });
       }
     });
