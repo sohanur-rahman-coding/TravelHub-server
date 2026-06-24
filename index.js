@@ -36,21 +36,32 @@ async function run() {
     const usersCollection = db.collection("user");
     const BookedTicketsCollection = db.collection("booked_tickets");
 
-    // 1. Get all tickets (Dynamic filter via query params)
+    // 1. Get all tickets (Dynamic filter, search & sort via query params)
     app.get("/api/tickets", async (req, res) => {
       try {
-        const { email, status } = req.query;
+        const { email, status, from, to, type, sortPrice } = req.query;
         let query = {};
+
         if (email) query.vendorEmail = email;
         if (status) query.verificationStatus = status;
 
+        if (from) query.from = { $regex: from, $options: "i" };
+        if (to) query.to = { $regex: to, $options: "i" };
+
+        if (type && type !== "All") query.type = type;
+
+        let sortOptions = { _id: -1 };
+        if (sortPrice === "asc") sortOptions = { price: 1 }; 
+        if (sortPrice === "desc") sortOptions = { price: -1 }; 
+
         const tickets = await ticketsCollection
           .find(query)
-          .sort({ _id: -1 })
+          .sort(sortOptions)
           .toArray();
 
         res.status(200).json(tickets);
       } catch (error) {
+        console.error("Error fetching tickets:", error);
         res.status(500).json({ message: "Internal server error" });
       }
     });
@@ -237,50 +248,62 @@ async function run() {
       try {
         const email = req.params.email;
 
-        const allTickets = await ticketsCollection.find({ vendorEmail: email }).toArray();
+        const allTickets = await ticketsCollection
+          .find({ vendorEmail: email })
+          .toArray();
         const totalTicketsAdded = allTickets.length;
 
         let availableStock = 0;
-        allTickets.forEach(ticket => {
+        allTickets.forEach((ticket) => {
           availableStock += Number(ticket.quantity || 0);
         });
 
-        const paidBookings = await BookedTicketsCollection.find({ 
-          vendorEmail: email, 
-          status: "paid" 
+        const paidBookings = await BookedTicketsCollection.find({
+          vendorEmail: email,
+          status: "paid",
         }).toArray();
 
         let totalTicketsSold = 0;
         let totalRevenue = 0;
         const monthlyMap = {};
 
-        paidBookings.forEach(booking => {
+        paidBookings.forEach((booking) => {
           totalTicketsSold += Number(booking.quantity);
           totalRevenue += Number(booking.totalPrice);
 
-          const timestamp = parseInt(booking._id.toString().substring(0, 8), 16) * 1000;
-          const monthYear = new Date(timestamp).toLocaleString('default', { month: 'short' });
+          const timestamp =
+            parseInt(booking._id.toString().substring(0, 8), 16) * 1000;
+          const monthYear = new Date(timestamp).toLocaleString("default", {
+            month: "short",
+          });
 
           if (!monthlyMap[monthYear]) {
-            monthlyMap[monthYear] = { month: monthYear, revenue: 0, bookings: 0 };
+            monthlyMap[monthYear] = {
+              month: monthYear,
+              revenue: 0,
+              bookings: 0,
+            };
           }
           monthlyMap[monthYear].revenue += Number(booking.totalPrice);
           monthlyMap[monthYear].bookings += Number(booking.quantity);
         });
 
         const revenueData = Object.values(monthlyMap);
-        
+
         const pieData = [
           { name: "Sold Tickets", value: totalTicketsSold, fill: "#10b981" },
-          { name: "Available Tickets", value: availableStock, fill: "#3b82f6" }
+          { name: "Available Tickets", value: availableStock, fill: "#3b82f6" },
         ];
 
         res.status(200).json({
           totalTicketsAdded,
           totalTicketsSold,
           totalRevenue,
-          revenueData: revenueData.length > 0 ? revenueData : [{ month: "No Data", revenue: 0, bookings: 0 }],
-          pieData
+          revenueData:
+            revenueData.length > 0
+              ? revenueData
+              : [{ month: "No Data", revenue: 0, bookings: 0 }],
+          pieData,
         });
       } catch (error) {
         res.status(500).json({ message: "Internal server error" });
@@ -354,19 +377,21 @@ async function run() {
           { $match: { userEmail: email, status: "paid" } },
           {
             $addFields: {
-              ticketObjId: { $toObjectId: "$ticketId" }
-            }
+              ticketObjId: { $toObjectId: "$ticketId" },
+            },
           },
           {
             $lookup: {
-              from: "tickets", 
+              from: "tickets",
               localField: "ticketObjId",
               foreignField: "_id",
-              as: "ticketDetails"
-            }
+              as: "ticketDetails",
+            },
           },
-          { $unwind: "$ticketDetails" } 
-        ]).sort({ _id: -1 }).toArray();
+          { $unwind: "$ticketDetails" },
+        ])
+          .sort({ _id: -1 })
+          .toArray();
 
         res.status(200).json(transactions);
       } catch (error) {
