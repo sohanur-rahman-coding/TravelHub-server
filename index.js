@@ -291,6 +291,33 @@ async function run() {
         res.status(500).json({ message: "Internal server error" });
       }
     });
+    // transations history get
+    app.get("/api/transactions/:email", async (req, res) => {
+      try {
+        const email = req.params.email;
+        const transactions = await BookedTicketsCollection.aggregate([
+          { $match: { userEmail: email, status: "paid" } },
+          {
+            $addFields: {
+              ticketObjId: { $toObjectId: "$ticketId" }
+            }
+          },
+          {
+            $lookup: {
+              from: "tickets", 
+              localField: "ticketObjId",
+              foreignField: "_id",
+              as: "ticketDetails"
+            }
+          },
+          { $unwind: "$ticketDetails" } 
+        ]).sort({ _id: -1 }).toArray();
+
+        res.status(200).json(transactions);
+      } catch (error) {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    });
 
     // update user role
     app.patch("/api/users/:id/role", async (req, res) => {
