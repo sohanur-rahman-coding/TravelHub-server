@@ -232,6 +232,61 @@ async function run() {
       }
     });
 
+    // vendor revenue
+    app.get("/api/vendor/:email/stats", async (req, res) => {
+      try {
+        const email = req.params.email;
+
+        const allTickets = await ticketsCollection.find({ vendorEmail: email }).toArray();
+        const totalTicketsAdded = allTickets.length;
+
+        let availableStock = 0;
+        allTickets.forEach(ticket => {
+          availableStock += Number(ticket.quantity || 0);
+        });
+
+        const paidBookings = await BookedTicketsCollection.find({ 
+          vendorEmail: email, 
+          status: "paid" 
+        }).toArray();
+
+        let totalTicketsSold = 0;
+        let totalRevenue = 0;
+        const monthlyMap = {};
+
+        paidBookings.forEach(booking => {
+          totalTicketsSold += Number(booking.quantity);
+          totalRevenue += Number(booking.totalPrice);
+
+          const timestamp = parseInt(booking._id.toString().substring(0, 8), 16) * 1000;
+          const monthYear = new Date(timestamp).toLocaleString('default', { month: 'short' });
+
+          if (!monthlyMap[monthYear]) {
+            monthlyMap[monthYear] = { month: monthYear, revenue: 0, bookings: 0 };
+          }
+          monthlyMap[monthYear].revenue += Number(booking.totalPrice);
+          monthlyMap[monthYear].bookings += Number(booking.quantity);
+        });
+
+        const revenueData = Object.values(monthlyMap);
+        
+        const pieData = [
+          { name: "Sold Tickets", value: totalTicketsSold, fill: "#10b981" },
+          { name: "Available Tickets", value: availableStock, fill: "#3b82f6" }
+        ];
+
+        res.status(200).json({
+          totalTicketsAdded,
+          totalTicketsSold,
+          totalRevenue,
+          revenueData: revenueData.length > 0 ? revenueData : [{ month: "No Data", revenue: 0, bookings: 0 }],
+          pieData
+        });
+      } catch (error) {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    });
+
     // Vendor: Update Booking Status (Accept / Reject)
     app.patch("/api/bookings/:id/status", async (req, res) => {
       try {
