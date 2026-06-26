@@ -83,8 +83,9 @@ const verifyAdmin = async (req, res, next) => {
 // ALL API ROUTES START HERE
 
 async function run() {
-  try {
-    await client.connect();
+    try {
+        // Connect the client to the server (optional starting in v4.7)
+        await client.connect();
     const db = client.db("TravelHub");
 
     ticketsCollection = db.collection("tickets");
@@ -301,27 +302,30 @@ async function run() {
       }
     });
 
-    //  Admin  reject or approved details(done)
-    app.patch("/api/tickets/:id", verifyToken, verifyAdmin, async (req, res) => {
-      try {
-        const { id } = req.params;
-        const updatedData = req.body;
-        const result = await ticketsCollection.updateOne(
-          { _id: new ObjectId(id) },
-          { $set: updatedData },
-        );
-        if (result.matchedCount === 0)
-          return res.status(404).json({ message: "Ticket not found" });
-        res.status(200).json({ message: "Ticket updated" });
-      } catch (error) {
-        res.status(500).json({ message: "Internal server error" });
-      }
-    });
-
+     // vendor : update tickets (done)
+    app.patch(
+      "/api/tickets/:id",
+      verifyToken,
     
+      async (req, res) => {
+        try {
+          const { id } = req.params;
+          const updatedData = req.body;
+          const result = await ticketsCollection.updateOne(
+            { _id: new ObjectId(id) },
+            { $set: updatedData },
+          );
+          if (result.matchedCount === 0)
+            return res.status(404).json({ message: "Ticket not found" });
+          res.status(200).json({ message: "Ticket updated" });
+        } catch (error) {
+          res.status(500).json({ message: "Internal server error" });
+        }
+      },
+    );
 
     // Vendor: Create a new ticket(done)
-    app.post("/api/tickets", verifyToken,verifyVendor, async (req, res) => {
+    app.post("/api/tickets", verifyToken, verifyVendor, async (req, res) => {
       try {
         const ticket = req.body;
         if (ticket.vendorEmail) {
@@ -342,51 +346,82 @@ async function run() {
         res.status(500).json({ message: "Internal server error" });
       }
     });
+    // vendor : update tickets
+    // app.patch("/api/tickets/:id", verifyToken, async (req, res) => {
+    //   try {
+    //     const { id } = req.params;
+    //     const updatedData = req.body;
+    //     const result = await ticketsCollection.updateOne(
+    //       { _id: new ObjectId(id) },
+    //       { $set: updatedData },
+    //     );
+    //     if (result.matchedCount === 0)
+    //       return res.status(404).json({ message: "Ticket not found" });
+    //     res.status(200).json({ message: "Ticket updated" });
+    //   } catch (error) {
+    //     res.status(500).json({ message: "Internal server error" });
+    //   }
+    // });
 
     // Vendor: Delete their own ticket (done)
-    app.delete("/api/tickets/:id", verifyToken, verifyVendor, async (req, res) => {
-      try {
-        const { id } = req.params;
-        const result = await ticketsCollection.deleteOne({
-          _id: new ObjectId(id),
-        });
-        if (result.deletedCount === 0)
-          return res.status(404).json({ message: "Ticket not found" });
-        res.status(200).json({ message: "Ticket deleted" });
-      } catch (error) {
-        res.status(500).json({ message: "Internal server error" });
-      }
-    });
+    app.delete(
+      "/api/tickets/:id",
+      verifyToken,
+      verifyVendor,
+      async (req, res) => {
+        try {
+          const { id } = req.params;
+          const result = await ticketsCollection.deleteOne({
+            _id: new ObjectId(id),
+          });
+          if (result.deletedCount === 0)
+            return res.status(404).json({ message: "Ticket not found" });
+          res.status(200).json({ message: "Ticket deleted" });
+        } catch (error) {
+          res.status(500).json({ message: "Internal server error" });
+        }
+      },
+    );
 
     // Vendor: Get all booking requests sent to this vendor (done)
-    app.get("/api/bookings/vendor/:email", verifyToken, verifyVendor, async (req, res) => {
-      try {
-        const email = req.params.email;
-        const bookings = await BookedTicketsCollection.find({
-          vendorEmail: email,
-        }).toArray();
-        res.status(200).json(bookings);
-      } catch (error) {
-        res.status(500).json({ message: "Internal server error" });
-      }
-    });
+    app.get(
+      "/api/bookings/vendor/:email",
+      verifyToken,
+      verifyVendor,
+      async (req, res) => {
+        try {
+          const email = req.params.email;
+          const bookings = await BookedTicketsCollection.find({
+            vendorEmail: email,
+          }).toArray();
+          res.status(200).json(bookings);
+        } catch (error) {
+          res.status(500).json({ message: "Internal server error" });
+        }
+      },
+    );
 
     // Vendor: Accept or Reject a user's booking request(done)
-    app.patch("/api/bookings/:id/status", verifyToken,verifyVendor, async (req, res) => {
-      try {
-        const id = req.params.id;
-        const { status } = req.body;
-        const result = await BookedTicketsCollection.updateOne(
-          { _id: new ObjectId(id) },
-          { $set: { status: status } },
-        );
-        if (result.matchedCount === 0)
-          return res.status(404).json({ message: "Booking not found" });
-        res.status(200).json({ message: `Booking ${status} successfully` });
-      } catch (error) {
-        res.status(500).json({ message: "Internal server error" });
-      }
-    });
+    app.patch(
+      "/api/bookings/:id/status",
+      verifyToken,
+      verifyVendor,
+      async (req, res) => {
+        try {
+          const id = req.params.id;
+          const { status } = req.body;
+          const result = await BookedTicketsCollection.updateOne(
+            { _id: new ObjectId(id) },
+            { $set: { status: status } },
+          );
+          if (result.matchedCount === 0)
+            return res.status(404).json({ message: "Booking not found" });
+          res.status(200).json({ message: `Booking ${status} successfully` });
+        } catch (error) {
+          res.status(500).json({ message: "Internal server error" });
+        }
+      },
+    );
 
     // Vendor: Get total revenue, sales, and stats for dashboard
     app.get(
@@ -523,7 +558,8 @@ async function run() {
     // Admin: Mark a vendor as fraud and hide all their tickets (done)
     app.patch(
       "/api/users/:id/fraud",
-      verifyToken,verifyAdmin,
+      verifyToken,
+      verifyAdmin,
       async (req, res) => {
         try {
           const { id } = req.params;
@@ -547,18 +583,15 @@ async function run() {
       },
     );
 
-    await client.db("admin").command({ ping: 1 });
-    console.log("Connected to MongoDB!");
-  } finally {
-    // await client.close();
-  }
+ await client.db("admin").command({ ping: 1 });
+        console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    } finally {
+        // Ensures that the client will close when you finish/error
+        // await client.close();
+    }
 }
 run().catch(console.dir);
 
-app.get("/", (req, res) => {
-  res.send("Server is running fine!");
-});
-
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+    console.log(`PromptForge Server listening on port ${PORT}`)
+})
