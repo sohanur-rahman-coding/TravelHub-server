@@ -82,10 +82,10 @@ const verifyAdmin = async (req, res, next) => {
 
 // ALL API ROUTES START HERE
 
-async function run() {
-    try {
+// async function run() {
+//     try {
         // Connect the client to the server (optional starting in v4.7)
-        await client.connect();
+        // await client.connect();
     const db = client.db("TravelHub");
 
     ticketsCollection = db.collection("tickets");
@@ -346,23 +346,7 @@ async function run() {
         res.status(500).json({ message: "Internal server error" });
       }
     });
-    // vendor : update tickets
-    // app.patch("/api/tickets/:id", verifyToken, async (req, res) => {
-    //   try {
-    //     const { id } = req.params;
-    //     const updatedData = req.body;
-    //     const result = await ticketsCollection.updateOne(
-    //       { _id: new ObjectId(id) },
-    //       { $set: updatedData },
-    //     );
-    //     if (result.matchedCount === 0)
-    //       return res.status(404).json({ message: "Ticket not found" });
-    //     res.status(200).json({ message: "Ticket updated" });
-    //   } catch (error) {
-    //     res.status(500).json({ message: "Internal server error" });
-    //   }
-    // });
-
+    
     // Vendor: Delete their own ticket (done)
     app.delete(
       "/api/tickets/:id",
@@ -583,14 +567,14 @@ async function run() {
       },
     );
 
- await client.db("admin").command({ ping: 1 });
-        console.log("Pinged your deployment. You successfully connected to MongoDB!");
-    } finally {
-        // Ensures that the client will close when you finish/error
-        // await client.close();
-    }
-}
-run().catch(console.dir);
+//  await client.db("admin").command({ ping: 1 });
+//         console.log("Pinged your deployment. You successfully connected to MongoDB!");
+//     } finally {
+//         // Ensures that the client will close when you finish/error
+//         // await client.close();
+//     }
+// }
+// run().catch(console.dir);
 
 app.listen(PORT, () => {
     console.log(`PromptForge Server listening on port ${PORT}`)
