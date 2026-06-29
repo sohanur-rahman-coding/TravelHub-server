@@ -81,5 +81,5 @@ The server should now be running on `http://localhost:5000`.
 - **Tickets:** Endpoints for vendors to add/update tickets, and for users to fetch approved/advertised tickets.
 - **Bookings:** Handle ticket booking requests, status updates (pending, accepted, rejected, paid), and Stripe payment intents.
 
----
-*Designed & Developed by Sohanur Rahman for Assignment Category A10_CAT-005*
+
+
