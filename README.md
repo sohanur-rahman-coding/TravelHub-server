@@ -4,7 +4,7 @@ This is the server-side repository for **TravelHub**, a comprehensive Online Tic
 
 ## 🔗 Links
 - **Live Server API:** [https://travel-hub-server-three.vercel.app/]
-- **Live Website:** [TravelHub | Your Ultimate Ticket Booking Platform](https://travell-hub-client.vercel.app/)
+- **Live Website:** [TravelHub | Your Ultimate Ticket Booking Platform](https://travell-hub-client.vercel.app)
 - **Client-side Repository:** [sohanur-rahman-coding/TravelHub-Client](https://github.com/sohanur-rahman-coding/TravelHub-Client)
 - **Server-side Repository:** [sohanur-rahman-coding/TravelHub-server](https://github.com/sohanur-rahman-coding/TravelHub-server)
 
