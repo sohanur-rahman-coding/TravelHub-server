@@ -489,8 +489,9 @@ const verifyAdmin = async (req, res, next) => {
       }
     });
 
-    // Admin: Toggle advertisement status for a ticket (max 6)(done)
-    app.patch("/api/tickets/:id/advertise", verifyToken, async (req, res) => {
+    // Admin: Toggle featured status for a ticket (max 6)
+    // FIX: added verifyAdmin — previously any authenticated user could feature tickets.
+    app.patch("/api/tickets/:id/advertise", verifyToken, verifyAdmin, async (req, res) => {
       try {
         const { id } = req.params;
         const { advertise } = req.body;
@@ -573,7 +574,7 @@ const verifyAdmin = async (req, res, next) => {
 //         // Ensures that the client will close when you finish/error
 //         // await client.close();
 //     }
-// }
+// }j
 // run().catch(console.dir);
 
 app.listen(PORT, () => {
